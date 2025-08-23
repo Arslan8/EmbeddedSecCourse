@@ -3,7 +3,7 @@
 
 int main(int argc, char *argv[]) {
 	char buf1[16];
-    char buf[16];
+    char buf[100];
 	char buf2[16];
 
     if (argc < 2) {
