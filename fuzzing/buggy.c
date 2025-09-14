@@ -2,9 +2,9 @@
 #include <string.h>
 
 int main(int argc, char *argv[]) {
-	char buf1[16];
-    char buf[100];
-	char buf2[16];
+	char buf1[5];
+    char buf[5];
+	char buf2[5];
 
     if (argc < 2) {
         printf("Usage: %s <input>\n", argv[0]);

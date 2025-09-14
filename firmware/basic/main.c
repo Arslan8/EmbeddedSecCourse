@@ -1,5 +1,6 @@
 typedef void (*ISR)(void);
 extern unsigned int _estack;
+int global = 0x1234;
 void main(); 
 __attribute__((section(".isr_vector")))
 ISR g_pfnVectors[] = {
