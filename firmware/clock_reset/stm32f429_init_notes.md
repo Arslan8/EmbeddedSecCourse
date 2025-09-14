@@ -1,7 +1,7 @@
 
 # STM32F429 Initialization — Self-Contained Intro Notes
 ## 1. Overview 
-On reset the STM32F429 runs from a default, conservative clock and minimal power configuration. Before running your application at full speed or using peripherals, you must: (1) enable caches and Flash settings for correct and performant instruction fetches, (2) enable peripheral clocks for modules you will configure (PWR, SYSCFG, GPIO, etc.), (3) pick and enable a clock source (HSI, HSE, PLL), (4) set voltage/regulator scaling to support your target speed, (5) configure Flash latency, prescalers, and then switch SYSCLK to the final source. Doing these steps in the right order avoids crashes and unpredictable behavior.
+On reset, the STM32F429 runs from a default, conservative clock and minimal power configuration. Before running your application at full speed or using peripherals, you must: (1) enable caches and Flash settings for correct and performant instruction fetches, (2) enable peripheral clocks for modules you will configure (PWR, SYSCFG, GPIO, etc.), (3) pick and enable a clock source (HSI, HSE, PLL), (4) set voltage/regulator scaling to support your target speed, (5) configure Flash latency, prescalers, and then switch SYSCLK to the final source. Doing these steps in the right order avoids crashes and unpredictable behavior.
 
 ---
 
@@ -11,7 +11,7 @@ On reset the STM32F429 runs from a default, conservative clock and minimal power
 - **RCC** — *Reset and Clock Control*. The unit that controls oscillators (HSI/HSE/PLL), prescalers, and peripheral clock gating (APB/AHB).
 - **AHB** — *Advanced High-performance Bus*. The high-speed bus used by core, SRAM, DMA, etc.
 - **APB1 / APB2** — *Advanced Peripheral Bus 1/2*. Buses for peripherals. APB1 is lower-speed; APB2 is higher-speed. Peripherals live on these buses and must have their clock enabled to access their registers.
-- **PWR** — *Power Control peripheral*. Lets firmware change internal regulator settings (VOS), manage low-power modes and overdrive features.
+- **PWR** — *Power Control peripheral*. Lets firmware change internal regulator settings (VOS), manage low-power modes, and overdrive features.
 - **SYSCFG** — *System Configuration Controller*. System-level features such as EXTI line mapping, memory remap, and some I/O compensation controls.
 - **HSI / HSE** — Internal (HSI) or external (HSE) high-speed oscillators. HSI is typically 16 MHz RC; HSE is your external crystal/oscillator (commonly 8 MHz).
 - **PLL** — Phase-Locked Loop: used to multiply a base oscillator frequency to a higher SYSCLK frequency (e.g., 168 MHz).
@@ -20,7 +20,7 @@ On reset the STM32F429 runs from a default, conservative clock and minimal power
 
 ---
 
-## 3. Why each building block is needed (reasoning / intuition)
+## 3. Why each building block is needed 
 
 ### 3.1 Flash and caches (ACR)
 - **Why it exists:** The Flash memory that stores program code is much slower than the CPU core. The MCU provides instruction and data caches and prefetch to bridge this gap. The ACR register controls these features and flash wait states.
@@ -31,7 +31,7 @@ On reset the STM32F429 runs from a default, conservative clock and minimal power
 - **Why we read-back after write:** Many HAL macros write an enable bit then immediately READ the same register into a `tmpreg` variable. The read forces the write to complete on the bus fabric and avoids race conditions where the peripheral is not yet clocked when you access it.
 
 ### 3.3 PWR and voltage scaling (VOS)
-- **Why it exists:** Digital logic requires sufficient supply voltage to switch reliably at higher frequencies. If you drive the clock faster than the voltage allows, the chip may misbehave or crash. The PWR peripheral lets firmware choose the VOS level that ensures stable operation at the target SYSCLK.
+- **Why it exists:** Digital logic requires a sufficient supply voltage to switch reliably at higher frequencies. If you drive the clock faster than the voltage allows, the chip may misbehave or crash. The PWR peripheral lets firmware choose the VOS level that ensures stable operation at the target SYSCLK.
 - **Best practice:** Set VOS before increasing the clock frequency.
 
 ### 3.4 Oscillators and PLL
@@ -44,7 +44,7 @@ On reset the STM32F429 runs from a default, conservative clock and minimal power
 ---
 
 ## 4. Common failures and what they look like (diagnostic reasoning)
-- **Too-low flash latency for new SYSCLK:** Random crashes, hard faults, wrong instruction execution. Symptom often occurs immediately after clock change.
+- **Too-low flash latency for new SYSCLK:** Random crashes, hard faults, wrong instruction execution. Symptom often occurs immediately after the clock change.
 - **Changed clocks but did not set VOS:** System may reset or hang when speed increases.
 - **Wrote to PWR register before enabling its clock:** Writes are ignored; subsequent VOS change has no effect.
 - **Accessed peripheral immediately after enabling its RCC bit (no readback):** Rare race conditions where the peripheral behaves as if it is disabled. The readback prevents that.
@@ -65,7 +65,7 @@ void SystemClock_Config_HSI(void)
     // 1) Enable PWR clock so we can set voltage scaling (safe habit)
     __HAL_RCC_PWR_CLK_ENABLE();
 
-    // 2) Set voltage scaling for normal full-speed operation if you plan to increase later
+    // 2) Set voltage scaling for normal full-speed operation if you plan to increase it later
     __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE1);
 
     // 3) Configure and enable HSI (16 MHz), no PLL
@@ -146,8 +146,7 @@ void SystemClock_Config_168MHz(void)
 
 ---
 
-## 7. Full "self-contained" checklist (one-page)
-Use this when teaching or when writing startup code:
+## 7. Full "self-contained" checklist
 
 1. Optional: Invalidate caches if reprogramming flash often. Then enable I/D caches:
    - `SCB_DisableDCache(); SCB_DisableICache();` then re-enable after flash programming.
@@ -157,20 +156,20 @@ Use this when teaching or when writing startup code:
 4. Configure oscillator (HSI or HSE + PLL) using `HAL_RCC_OscConfig` and check ready flags. Example: HSE on + PLL on.
 5. Choose AHB/APB prescalers to keep peripheral buses under max frequency.
 6. Set Flash latency appropriate for final SYSCLK. (Use HAL macro `FLASH_LATENCY_x` or check RM table.)
-7. Switch SYSCLK to final clock source using `HAL_RCC_ClockConfig` (HAL does latencies and checks for you).
+7. Switch SYSCLK to the final clock source using `HAL_RCC_ClockConfig` (HAL does latencies and checks for you).
 8. Enable specific peripheral clocks (GPIO, SYSCFG, USART, etc.) when you plan to access them:
    - `__HAL_RCC_GPIOA_CLK_ENABLE(); __HAL_RCC_SYSCFG_CLK_ENABLE();` etc.
 9. Update `SystemCoreClock` (CMSIS/HAL usually does this) if needed.
 
 ---
 
-## 8. Debugging tips and useful checks (self-contained)
+## 8. Debugging tips and useful checks
 - **Check oscillator ready bits:** `if (RCC->CR & RCC_CR_HSERDY) { /* HSE ready */ }`
 - **Check PLL ready:** `if (RCC->CR & RCC_CR_PLLRDY) { /* PLL locked */ }`
 - **Check SYSCLK source:** read `RCC->CFGR & RCC_CFGR_SWS` to find current source.
 - **Check Flash latency register:** `FLASH->ACR & FLASH_ACR_LATENCY` to confirm wait states.
-- **If system faults occur after clock change:** halt in debugger and inspect `CFSR` and `HFSR` fault registers; if faults happen at same instruction repeatedly, suspect Flash latency or cache corruption.
-- **Use LED/GPIO toggle to verify clock frequency:** Toggle a pin from a timer to observe expected frequency on an oscilloscope.
+- **If system faults occur after clock change:** halt in debugger and inspect `CFSR` and `HFSR` fault registers; if faults happen at the same instruction repeatedly, suspect Flash latency or cache corruption.
+- **Use LED/GPIO toggle to verify clock frequency:** Toggle a pin from a timer to observe the expected frequency on an oscilloscope.
 
 ---
 
